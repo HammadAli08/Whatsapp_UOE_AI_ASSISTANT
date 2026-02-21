@@ -185,23 +185,23 @@ def _get_or_update_namespace(session_id: str, text: str) -> tuple[str, str]:
     from memory, or fallback to the default.
     """
     memory = get_memory()
-    memory_key = f"{session_id}_namespace"
-    
+    memory_key = f"uoe:ns:{session_id}"
+
     # 1. Did they type a slash command?
     if text.startswith("/"):
         parts = text.split(None, 1)
         prefix = parts[0][1:].lower()  # remove leading /
         if prefix in VALID_NAMESPACES:
             # Save new preference to Redis
-            if memory.redis_client:
-                memory.redis_client.set(memory_key, prefix, ex=86400) # Expire in 24 hours
-            
+            if memory.available:
+                memory._client.set(memory_key, prefix, ex=86400)
+
             clean_text = parts[1].strip() if len(parts) > 1 else ""
             return prefix, clean_text
 
     # 2. If no slash command, check Redis for previous preference
-    if memory.redis_client:
-        saved = memory.redis_client.get(memory_key)
+    if memory.available:
+        saved = memory._client.get(memory_key)
         if saved and saved in VALID_NAMESPACES:
             return saved, text
 
