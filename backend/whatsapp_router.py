@@ -3,16 +3,19 @@ WhatsApp Webhook Router
 
 Receives incoming WhatsApp messages via the Meta Cloud API webhook,
 routes them through the RAG pipeline, and sends the response back.
+
+CRITICAL: Meta expects a 200 OK within ~5 seconds.  All heavy work
+(RAG query, reply send) runs as a background task so the webhook
+responds instantly.
 """
 
 import os
-import json
-import uuid
+import asyncio
 import logging
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request, Response, BackgroundTasks
 
 from rag_pipeline import get_pipeline
 from rag_pipeline.config import VALID_NAMESPACES
@@ -24,7 +27,7 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
 WHATSAPP_DEFAULT_NAMESPACE = os.getenv("WHATSAPP_DEFAULT_NAMESPACE", "bs-adp")
-WHATSAPP_API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v21.0")
+WHATSAPP_API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v22.0")
 
 # ── Router ──────────────────────────────────────────────────────────────────
 whatsapp_router = APIRouter(prefix="/api/whatsapp", tags=["WhatsApp"])
@@ -35,10 +38,13 @@ whatsapp_router = APIRouter(prefix="/api/whatsapp", tags=["WhatsApp"])
 # ═════════════════════════════════════════════════════════════════════════════
 
 @whatsapp_router.api_route("/webhook", methods=["GET", "POST"])
-async def whatsapp_webhook(request: Request) -> Response:
+async def whatsapp_webhook(request: Request, bg: BackgroundTasks) -> Response:
     """
     GET  → Meta webhook verification handshake.
     POST → Incoming user messages from WhatsApp Cloud API.
+
+    The POST handler returns 200 OK *immediately* and schedules
+    all heavy processing (RAG query + reply) as a background task.
     """
 
     # ── GET: Webhook verification ────────────────────────────────────────
@@ -59,7 +65,6 @@ async def whatsapp_webhook(request: Request) -> Response:
     try:
         body = await request.json()
 
-        # Validate payload structure
         entries = body.get("entry", [])
         if not entries:
             return Response(content="No entry", status_code=200)
@@ -88,49 +93,71 @@ async def whatsapp_webhook(request: Request) -> Response:
                         "Unsupported message type '%s' from %s — skipping",
                         msg_type, from_number,
                     )
-                    await _send_text(
+                    # Fire-and-forget: tell the user we only handle text
+                    bg.add_task(
+                        _send_text,
                         from_number,
                         "⚠️ Sorry, I can only process text messages at the moment. "
                         "Please send your question as text.",
                     )
-                    return Response(content="Unsupported type", status_code=200)
+                    return Response(content="OK", status_code=200)
 
                 # ── Namespace detection (optional prefix) ────────────
                 namespace, clean_query = _parse_namespace_prefix(user_text)
 
-                # ── Process through RAG pipeline ─────────────────────
                 logger.info(
                     "WhatsApp → from=%s namespace=%s query='%s'",
                     from_number, namespace, clean_query[:80],
                 )
 
-                try:
-                    pipeline = get_pipeline()
-                    result = pipeline.query(
-                        user_query=clean_query,
-                        namespace=namespace,
-                        enhance_query=True,
-                        session_id=from_number,  # phone number = session ID
-                        enable_smart=False,
-                    )
-                    reply = _format_reply(result)
-                except Exception as pipe_err:
-                    logger.error("Pipeline error: %s", pipe_err, exc_info=True)
-                    reply = (
-                        "❌ I encountered an error processing your question. "
-                        "Please try again in a moment."
-                    )
+                # ── Schedule heavy work in background ────────────────
+                bg.add_task(
+                    _process_and_reply,
+                    from_number,
+                    clean_query,
+                    namespace,
+                )
 
-                # ── Send reply back via WhatsApp ─────────────────────
-                sent = await _send_text(from_number, reply)
-                if not sent:
-                    logger.error("Failed to send WhatsApp reply to %s", from_number)
-
+        # Return 200 OK immediately so Meta doesn't timeout
         return Response(content="OK", status_code=200)
 
     except Exception as exc:
         logger.error("WhatsApp webhook error: %s", exc, exc_info=True)
-        return Response(content="Internal error", status_code=500)
+        return Response(content="OK", status_code=200)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# BACKGROUND WORKER
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _process_and_reply(from_number: str, query: str, namespace: str) -> None:
+    """
+    Run the RAG pipeline synchronously (it's CPU/IO-bound) and send
+    the reply back to the user.  This runs in a background thread
+    managed by FastAPI's BackgroundTasks.
+    """
+    try:
+        pipeline = get_pipeline()
+        result = pipeline.query(
+            user_query=query,
+            namespace=namespace,
+            enhance_query=True,
+            session_id=from_number,  # phone number = session ID
+            enable_smart=False,
+        )
+        reply = _format_reply(result)
+    except Exception as pipe_err:
+        logger.error("Pipeline error: %s", pipe_err, exc_info=True)
+        reply = (
+            "❌ I encountered an error processing your question. "
+            "Please try again in a moment."
+        )
+
+    # Send reply (sync wrapper around async httpx)
+    try:
+        asyncio.run(_send_text(from_number, reply))
+    except Exception as send_err:
+        logger.error("Failed to send WhatsApp reply: %s", send_err, exc_info=True)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -207,7 +234,6 @@ async def _send_text(to: str, text: str) -> bool:
     }
 
     # WhatsApp has a 4096 character limit per text message
-    # If the reply is longer, we truncate gracefully
     if len(text) > 4000:
         text = text[:3990] + "\n\n…(truncated)"
 
@@ -220,7 +246,7 @@ async def _send_text(to: str, text: str) -> bool:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(url, headers=headers, json=payload)
 
         if resp.status_code == 200:
@@ -229,7 +255,7 @@ async def _send_text(to: str, text: str) -> bool:
 
         logger.error(
             "WhatsApp API error: status=%d body=%s",
-            resp.status_code, resp.text[:300],
+            resp.status_code, resp.text[:500],
         )
         return False
 
