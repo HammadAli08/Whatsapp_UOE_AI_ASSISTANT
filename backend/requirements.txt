@@ -1,0 +1,35 @@
+# Vector Database
+pinecone>=3.0.0
+
+# LangChain (LATEST modular stack — Python 3.12 compatible)
+langchain-core>=0.3.20
+langchain-community>=0.3.20
+langchain-openai>=0.3.5
+langchain-pinecone>=0.2.13
+langchain-text-splitters>=0.3.20
+langsmith[openai-agents]
+
+# Document processing
+pypdf>=4.3.1
+
+# Utilities
+python-dotenv>=1.0.1
+tqdm>=4.67.1
+regex>=2024.11.6
+
+# HTTP Client (HF Inference API + OpenAI SDK)
+httpx[http2]>=0.27.0
+
+# OpenAI SDK (for GPT-4o)
+openai>=1.0.0
+
+# Redis (short-term memory)
+redis>=5.0.0
+
+# LangSmith (tracing & observability)
+langsmith>=0.1.0
+
+# FastAPI Backend
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.0.0

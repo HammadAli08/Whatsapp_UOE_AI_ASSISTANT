@@ -1,0 +1,58 @@
+Traceback (most recent call last):
+  File "/home/hammadali08/PycharmProjects/UOE_AI_ASSISTANT/backend/.venv/bin/uvicorn", line 10, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/click/core.py", line 1485, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/click/core.py", line 1406, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/click/core.py", line 1269, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/click/core.py", line 824, in invoke
+    return callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/uvicorn/main.py", line 424, in main
+    run(
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/uvicorn/main.py", line 594, in run
+    server.run()
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/uvicorn/server.py", line 67, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/uvicorn/server.py", line 71, in serve
+    await self._serve(sockets)
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/uvicorn/server.py", line 78, in _serve
+    config.load()
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/uvicorn/config.py", line 439, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/uvicorn/importer.py", line 22, in import_from_string
+    raise exc from None
+  File "/mnt/data/hammadali08/Personal/UOE_AI_ASSISTANT/backend/.venv/lib64/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.12/importlib/__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/mnt/data/hammadali08/PycharmProjects/UOE_AI_ASSISTANT/backend/main.py", line 18, in <module>
+    from rag_pipeline import get_pipeline
+  File "/mnt/data/hammadali08/PycharmProjects/UOE_AI_ASSISTANT/backend/rag_pipeline/__init__.py", line 21, in <module>
+    from .memory import ConversationMemory, get_memory
+  File "/mnt/data/hammadali08/PycharmProjects/UOE_AI_ASSISTANT/backend/rag_pipeline/memory.py", line 12, in <module>
+    import redis
+ModuleNotFoundError: No module named 'redis'

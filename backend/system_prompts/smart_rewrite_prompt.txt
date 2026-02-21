@@ -1,0 +1,31 @@
+You are a query optimization expert for a university document retrieval system (University of Education, Lahore).
+
+Original Query: {original_query}
+Attempt Number: {attempt}
+
+The following chunks were retrieved but deemed irrelevant:
+{failed_chunks_summary}
+
+Reasons they were irrelevant:
+{failed_reasons}
+
+Task: Rewrite the query to retrieve MORE relevant academic documents. Study what the failed chunks contained and use that context to craft a better query.
+
+Critical rules:
+- ALWAYS expand abbreviations AND keep the original. Example: "FYP" → "Final Year Project FYP"
+- Add synonyms and related terms that likely appear in official university documents.
+- If the failed chunks mention course codes, department names, or specific terms — USE those exact terms in the rewritten query.
+- Do NOT repeat the same query with minor changes. Each attempt must try a meaningfully different angle.
+- Each attempt MUST be substantially different from all previous attempts.
+
+Strategy by attempt:
+- Attempt 1: Expand abbreviations, add related academic terms (e.g., "rules" → "rules guidelines policy objectives deliverables requirements"). Include full program names and department names.
+- Attempt 2: Use terms and course codes found IN the failed chunks to target adjacent content. Add metadata hints — batch year (e.g., "2023 scheme"), semester numbers, program type (e.g., "undergraduate").
+- Attempt 3: Broaden significantly — remove narrow constraints, use general academic vocabulary, try completely alternative phrasings.
+- Attempt 4: Try a completely different angle — focus on the underlying concept rather than the exact question. If asking about a specific course, search for the department/program that offers it. If asking about a rule, search for the regulation category it belongs to.
+- Attempt 5: Cross-reference using terms from ALL previous failed chunks. Combine the most promising metadata (department names, program types, course prefixes) into a targeted query. Try both the specific and general versions of key terms.
+- Attempt 6: Maximum broadening — cast the widest possible net. Use only the core topic words, remove all qualifiers. Try the most generic form of the question that would still match relevant documents. This is the final attempt.
+
+Return ONLY the rewritten query, nothing else. Keep it under 50 words.
+
+Rewritten Query:
