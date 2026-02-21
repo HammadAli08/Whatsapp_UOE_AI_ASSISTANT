@@ -18,6 +18,7 @@ import httpx
 from fastapi import APIRouter, Request, Response, BackgroundTasks
 
 from rag_pipeline import get_pipeline
+from rag_pipeline.memory import get_memory
 from rag_pipeline.config import VALID_NAMESPACES
 
 logger = logging.getLogger(__name__)
@@ -102,8 +103,8 @@ async def whatsapp_webhook(request: Request, bg: BackgroundTasks) -> Response:
                     )
                     return Response(content="OK", status_code=200)
 
-                # ── Namespace detection (optional prefix) ────────────
-                namespace, clean_query = _parse_namespace_prefix(user_text)
+                # ── Namespace detection ──────────────────────────────
+                namespace, clean_query = _get_or_update_namespace(from_number, user_text)
 
                 logger.info(
                     "WhatsApp → from=%s namespace=%s query='%s'",
@@ -177,45 +178,41 @@ def _extract_text(message: dict, msg_type: str) -> Optional[str]:
     return None
 
 
-def _parse_namespace_prefix(text: str) -> tuple[str, str]:
+def _get_or_update_namespace(session_id: str, text: str) -> tuple[str, str]:
     """
-    Allow users to switch namespace with a prefix, e.g.:
-        /rules What is the attendance policy?
-        /ms-phd PhD admission requirements
-
-    Falls back to the default namespace if no prefix is found.
+    Check if the user is switching namespaces via prefix (e.g. /rules).
+    If so, save it to Redis memory. If not, load their last used namespace
+    from memory, or fallback to the default.
     """
+    memory = get_memory()
+    memory_key = f"{session_id}_namespace"
+    
+    # 1. Did they type a slash command?
     if text.startswith("/"):
         parts = text.split(None, 1)
-        prefix = parts[0][1:].lower()  # remove the leading /
-        if prefix in VALID_NAMESPACES and len(parts) > 1:
-            return prefix, parts[1].strip()
+        prefix = parts[0][1:].lower()  # remove leading /
+        if prefix in VALID_NAMESPACES:
+            # Save new preference to Redis
+            if memory.redis_client:
+                memory.redis_client.set(memory_key, prefix, ex=86400) # Expire in 24 hours
+            
+            clean_text = parts[1].strip() if len(parts) > 1 else ""
+            return prefix, clean_text
+
+    # 2. If no slash command, check Redis for previous preference
+    if memory.redis_client:
+        saved = memory.redis_client.get(memory_key)
+        if saved and saved in VALID_NAMESPACES:
+            return saved, text
+
+    # 3. Fallback to default
     return WHATSAPP_DEFAULT_NAMESPACE, text
 
 
 def _format_reply(result: dict) -> str:
     """Format the RAG pipeline result into a WhatsApp-friendly message."""
-    answer = result.get("answer", "No answer generated.")
-
-    # Append source references if available
-    sources = result.get("sources", [])
-    if sources:
-        unique_files = []
-        seen = set()
-        for src in sources[:3]:  # top 3 sources max
-            fname = src.get("file", "")
-            if fname and fname not in seen:
-                seen.add(fname)
-                page = src.get("page", "")
-                label = f"📄 {fname}"
-                if page and page != "N/A":
-                    label += f" (p. {page})"
-                unique_files.append(label)
-
-        if unique_files:
-            answer += "\n\n─── Sources ───\n" + "\n".join(unique_files)
-
-    return answer
+    # User requested NO SOURCES on WhatsApp.
+    return result.get("answer", "No answer generated.")
 
 
 async def _send_text(to: str, text: str) -> bool:
